@@ -1,6 +1,9 @@
 # iDroidSim
 Android emulator for Mac
 
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/c38b691a-3546-4678-a89a-a6c96dd1c74b" />
+
+
 # Introduction
 iDroidSim is an Android emulator management tool for macOS, providing a graphical interface to manage Android Virtual Devices (AVD).
 

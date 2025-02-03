@@ -464,13 +464,25 @@ class EmulatorListThread(QThread):
     finished = pyqtSignal(list, list)  # 发送 (模拟器列表, 运行中的模拟器列表)
     error = pyqtSignal(str)  # 发送错误信息
     
+    def __init__(self):
+        super().__init__()
+        self._is_running = True
+    
     def run(self):
         try:
+            # 如果线程已停止，直接返回
+            if not self._is_running:
+                return
+                
             # 获取模拟器列表
             result = subprocess.run([EMULATOR_PATH, '-list-avds'], 
                                  capture_output=True, text=True)
             emulators = [emu for emu in result.stdout.strip().split('\n') if emu]
             
+            # 如果线程已停止，直接返回
+            if not self._is_running:
+                return
+                
             # 获取正在运行的模拟器
             ps_result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
             running_processes = ps_result.stdout.strip().split('\n')
@@ -486,10 +498,17 @@ class EmulatorListThread(QThread):
                         if emu_name in emulators:
                             running_emulators.append(emu_name)
             
-            self.finished.emit(emulators, running_emulators)
+            # 如果线程仍在运行，发送结果
+            if self._is_running:
+                self.finished.emit(emulators, running_emulators)
             
         except Exception as e:
-            self.error.emit(str(e))
+            if self._is_running:
+                self.error.emit(str(e))
+    
+    def stop(self):
+        """停止线程"""
+        self._is_running = False
 
 class EmulatorManager(QMainWindow):
     def __init__(self):
@@ -627,7 +646,7 @@ class EmulatorManager(QMainWindow):
         
         # 添加刷新按钮
         refresh_btn = StyledButton("刷新列表", "icons/refresh.png")
-        refresh_btn.clicked.connect(self.refresh_emulators)
+        refresh_btn.clicked.connect(lambda: self.refresh_emulators(show_loading=True))
         button_layout.addWidget(refresh_btn)
         
         main_layout.addLayout(button_layout)
@@ -684,8 +703,7 @@ class EmulatorManager(QMainWindow):
                     avdmanager, 'create', 'avd',
                     '-n', name,  # 模拟器名称
                     '-k', system_image,  # 系统镜像
-                    '-d', device,  # 设备类型
-                    '-c', 'hw.ramSize=2048M'  # 创建 2GB 的 SD 卡
+                    '-d', device  # 设备类型
                 ]
 
                 # 输出创建命令
@@ -722,7 +740,7 @@ class EmulatorManager(QMainWindow):
                     f.write('\nhw.camera.back=webcam0')  # 配置后置摄像头
                     f.write('\nhw.camera.front=webcam0')  # 配置前置摄像头
                 
-                self.toast.showMessage(f"模拟器 {name} 创建成功")
+                # 刷新模拟器列表
                 self.refresh_emulators()
                 
                 # 根据开关状态决定是否启动模拟器
@@ -737,18 +755,24 @@ class EmulatorManager(QMainWindow):
         try:
             subprocess.Popen([EMULATOR_PATH, '-avd', emulator_name])
             self.toast.showMessage(f"正在启动模拟器：{emulator_name}")
-            QTimer.singleShot(2000, self.refresh_emulators)
+            QTimer.singleShot(2000, lambda: self.refresh_emulators())
         except Exception as e:
             self.toast.showMessage(f"启动模拟器失败：{str(e)}")
     
-    def refresh_emulators(self):
-        """刷新模拟器列表"""
+    def refresh_emulators(self, show_loading=False):
+        """刷新模拟器列表
+        Args:
+            show_loading: 是否显示加载动画，默认为False
+        """
         self.emulator_list.clear()
         
-        # 显示加载动画
-        self.loading.show()
+        # 只在需要时显示加载动画
+        if show_loading:
+            self.loading.show()
         
         # 创建并启动加载线程
+        if self.load_thread:
+            self.load_thread.stop()
         self.load_thread = EmulatorListThread()
         self.load_thread.finished.connect(self.handle_emulators_loaded)
         self.load_thread.error.connect(self.handle_load_error)
@@ -798,7 +822,7 @@ class EmulatorManager(QMainWindow):
             if target_pid:
                 subprocess.run(['kill', target_pid])
                 self.toast.showMessage(f"正在关闭模拟器：{emulator_name}")
-                QTimer.singleShot(5000, self.refresh_emulators)
+                QTimer.singleShot(5000, lambda: self.refresh_emulators())
             else:
                 self.toast.showMessage(f"模拟器 {emulator_name} 未在运行")
                 self.refresh_emulators()

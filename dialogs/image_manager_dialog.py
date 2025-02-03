@@ -15,19 +15,33 @@ class LoadImagesThread(QThread):
     finished = pyqtSignal(list, list)  # 发送 (可用镜像列表, 已安装镜像列表)
     error = pyqtSignal(str)  # 发送错误信息
     
+    def __init__(self):
+        super().__init__()
+        self._is_running = True
+    
     def run(self):
         try:
+            # 创建一个定时器线程
+            timer = QTimer()
+            timer.setSingleShot(True)
+            timer.timeout.connect(self.handle_timeout)
+            timer.start(30000)  # 30秒超时
+            
             sdkmanager = os.path.join(os.path.dirname(find_avdmanager()), 'sdkmanager')
             if not os.path.exists(sdkmanager):
                 raise Exception("找不到 sdkmanager 工具")
             
             # 获取所有可用镜像
             list_cmd = [sdkmanager, '--list']
-            result = subprocess.run(list_cmd, capture_output=True, text=True)
+            result = subprocess.run(list_cmd, capture_output=True, text=True, timeout=30)
             
             # 获取已安装镜像
             installed_cmd = [sdkmanager, '--list_installed']
-            installed_result = subprocess.run(installed_cmd, capture_output=True, text=True)
+            installed_result = subprocess.run(installed_cmd, capture_output=True, text=True, timeout=30)
+            
+            # 如果线程已被终止，直接返回
+            if not self._is_running:
+                return
             
             # 解析可用镜像
             available_images = {}
@@ -70,11 +84,27 @@ class LoadImagesThread(QThread):
                     except:
                         continue
             
-            # 发送结果
-            self.finished.emit(list(available_images.values()), installed_images)
+            # 停止定时器
+            timer.stop()
             
+            # 如果线程仍在运行，发送结果
+            if self._is_running:
+                self.finished.emit(list(available_images.values()), installed_images)
+            
+        except subprocess.TimeoutExpired:
+            self.error.emit("加载超时，请检查网络连接")
         except Exception as e:
-            self.error.emit(str(e))
+            if self._is_running:
+                self.error.emit(str(e))
+    
+    def handle_timeout(self):
+        """处理超时"""
+        self._is_running = False
+        self.error.emit("加载超时，请检查网络连接")
+    
+    def stop(self):
+        """停止线程"""
+        self._is_running = False
 
 class ImageManagerDialog(QDialog):
     def __init__(self, parent=None):
@@ -241,6 +271,8 @@ class ImageManagerDialog(QDialog):
         self.loading.show()
         
         # 创建并启动加载线程
+        if self.load_thread:
+            self.load_thread.stop()
         self.load_thread = LoadImagesThread()
         self.load_thread.finished.connect(self.handle_images_loaded)
         self.load_thread.error.connect(self.handle_load_error)
@@ -547,7 +579,12 @@ class ImageManagerDialog(QDialog):
             except Exception as e:
                 QMessageBox.warning(self, "错误", f"删除镜像失败：{str(e)}")
 
-
+    def closeEvent(self, event):
+        """关闭事件"""
+        # 停止加载线程
+        if self.load_thread:
+            self.load_thread.stop()
+        super().closeEvent(event)
 
 class ImageDownloadThread(QThread):
     """镜像下载线程"""

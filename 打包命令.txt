@@ -1,0 +1,8 @@
+# 1. 清理之前的构建
+rm -rf build dist
+
+# 2. 重新构建
+python setup.py py2app
+
+# 3. 构建 DMG
+python build_dmg.py

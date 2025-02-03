@@ -862,7 +862,7 @@ class EmulatorManager(QMainWindow):
                 if result.returncode != 0:
                     raise Exception(result.stderr or result.stdout)
                 
-                self.toast.showMessage(f"模拟器 {emulator_name} 已删除")
+                # 删除成功后直接刷新列表，不显示 toast
                 self.refresh_emulators()
                 
             except Exception as e:

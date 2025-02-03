@@ -381,9 +381,6 @@ class ImageManagerDialog(QDialog):
     def handle_download_finished(self, version):
         """处理下载完成"""
         try:
-            # 恢复按钮状态
-            self.toast.showMessage(f"Android {version} 系统镜像下载完成")
-            
             # 配置环境变量
             sdk_root = os.path.expanduser("~/Library/Android/sdk")
             shell_type = os.path.basename(os.environ.get('SHELL', '/bin/bash'))
@@ -428,7 +425,6 @@ class ImageManagerDialog(QDialog):
                         check=True,
                         capture_output=True
                     )
-                    self.toast.showMessage("环境变量已自动刷新")
                 except Exception as e:
                     print(f"刷新环境变量时出错: {str(e)}")
                 
@@ -492,7 +488,6 @@ class ImageManagerDialog(QDialog):
             }
         """)
         
-        # 如果用户确认删除
         if confirm.exec() == QMessageBox.StandardButton.Yes:
             try:
                 # 创建并显示进度对话框
@@ -502,6 +497,7 @@ class ImageManagerDialog(QDialog):
                 progress.setRange(0, 0)  # 设置为循环动画
                 progress.setWindowModality(Qt.WindowModality.WindowModal)
                 progress.setAutoClose(True)
+                progress.setCancelButton(None)  # 不显示取消按钮
                 progress.setStyleSheet("""
                     QProgressDialog {
                         background-color: white;
@@ -518,15 +514,6 @@ class ImageManagerDialog(QDialog):
                         text-align: center;
                         background-color: #f5f6fa;
                         min-height: 20px;
-                    }
-                    QPushButton {
-                        padding: 8px 20px;
-                        border-radius: 5px;
-                        font-size: 13px;
-                        font-weight: bold;
-                        background-color: #f5f6fa;
-                        color: #2c3e50;
-                        border: 2px solid #dcdde1;
                     }
                 """)
                 progress.show()
@@ -553,9 +540,6 @@ class ImageManagerDialog(QDialog):
                 
                 if process.returncode != 0:
                     raise Exception(f"删除失败: {output}")
-                
-                # 显示成功提示
-                self.toast.showMessage(f"Android {version} 系统镜像已删除")
                 
                 # 刷新列表
                 self.load_images()

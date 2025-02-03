@@ -6,10 +6,14 @@ class LoadingDialog(QDialog):
     """加载动画对话框"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
+        # 设置为无边框窗口
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        # 设置模态
+        self.setWindowModality(Qt.WindowModality.WindowModal)
+        # 设置背景透明
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
-        self.setFixedSize(200,150)
+        # 禁止关闭
+        self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
         
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -41,13 +45,24 @@ class LoadingDialog(QDialog):
         super().showEvent(event)
         self.movie.start()
         
-        # 居中显示
-        parent_rect = self.parent().geometry()
-        x = parent_rect.center().x() - self.width() // 2
-        y = parent_rect.center().y() - self.height() // 2
-        self.move(x, y)
+        # 如果有父窗口，居中显示在父窗口中
+        if self.parent():
+            parent_rect = self.parent().geometry()
+            x = parent_rect.x() + (parent_rect.width() - self.width()) // 2
+            y = parent_rect.y() + (parent_rect.height() - self.height()) // 2
+            self.move(x, y)
     
     def hideEvent(self, event):
         """隐藏事件"""
         super().hideEvent(event)
-        self.movie.stop() 
+        self.movie.stop()
+    
+    def moveEvent(self, event):
+        """移动事件 - 保持在父窗口中心"""
+        if self.parent():
+            parent_rect = self.parent().geometry()
+            x = parent_rect.x() + (parent_rect.width() - self.width()) // 2
+            y = parent_rect.y() + (parent_rect.height() - self.height()) // 2
+            if self.pos() != (x, y):
+                self.move(x, y)
+        super().moveEvent(event) 

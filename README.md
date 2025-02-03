@@ -1,5 +1,6 @@
 # iDroidSim
 Android emulator for Mac
+
 <img width="800" alt="image" src="https://github.com/user-attachments/assets/4df68294-f0ab-4336-8f69-34aa0f06f493" />
 
 
